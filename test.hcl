@@ -4,6 +4,9 @@ include "provider" {
   path = "a"
 
   db_name            = "${local.project.name}_${replace(local.application.name, "-", "_")}"
+
+  val2 = -3
+  val2 = - dependency.vpc[0].fds
 }
 
 # terraform {

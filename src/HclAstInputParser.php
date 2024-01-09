@@ -6,6 +6,15 @@ class HclAstInputParser
 {
     private const BLOCKS = ['remote_state', 'terraform', 'inputs', 'include', 'locals', 'dependency', 'dependencies', 'generate'];
 
+    private const PRECEDENCE = [
+        "=" => 1,
+        "+" => 10,
+        "-" => 10,
+        "*" => 20,
+        "/" => 20,
+        "%" => 20,
+    ];
+
     public function __construct(private HclAstInputTokenizer $input)
     {
     }
@@ -119,26 +128,7 @@ class HclAstInputParser
 
     private function parseBlockVarEqValue(): array
     {
-        if (
-            $this->input->peek()['type'] === 'var'
-            || $this->input->peek()['type'] === 'str' // variable name as string is also allowed
-            || $this->input->peek()['type'] === 'num' // variable name as string is also allowed
-        ) {
-            $name = $this->input->peek()['value'];
-            $this->input->next();
-        } else {
-            $this->croak('Expected variable, string or number');
-        }
-
-        if (!$this->maybeOpNext('=') && !$this->maybeOpNext(':')) {
-            $this->croak('Expected = or :');
-        }
-
-        $result = [
-            'type' => 'var',
-            'name' =>  $name,
-            'expr' => $this->parseExpession(),
-        ];
+        $result = $this->maybeBinary($this->parseAtom(), 0);
         $this->maybePuncNext(',');
         return $result;
     }
@@ -160,7 +150,7 @@ class HclAstInputParser
         $this->croak('Expected variable');
     }
 
-    private function parseExpession(): array
+    private function parseAtom(): array
     {
         // raw string
         if ($this->input->peek()['type'] === 'str') {
@@ -184,7 +174,7 @@ class HclAstInputParser
 
                 $args = [];
                 while (!$this->isPunc(')')) {
-                    $args[] = $this->parseExpession();
+                    $args[] = $this->parseExpression();
                     $this->maybePuncNext(',');
                 }
 
@@ -214,7 +204,7 @@ class HclAstInputParser
 
             $items = [];
             while (!$this->isPunc(']')) {
-                $items[] = $this->parseExpession();
+                $items[] = $this->parseExpression();
                 $this->maybePuncNext(',');
             }
 
@@ -259,13 +249,44 @@ class HclAstInputParser
                 $this->input->next();
                 $result['partials'][] = [
                     'type' => 'listKey',
-                    'key' => $this->parseExpession(),
+                    'key' => $this->parseExpression(),
                 ];
 
                 $this->expectPuncNext(']');
             }
         }
         return $result;
+    }
+
+    private function parseExpression()
+    {
+        return $this->maybeBinary($this->parseAtom(), 0);
+    }
+
+    private function maybeBinary(array $left, int $myPrec)
+    {
+        $item = $this->input->peek();
+        if ($item['type'] === 'op') {
+            $hisPrec = self::PRECEDENCE[$item['value']];
+            if ($hisPrec > $myPrec) {
+
+                // dirty hack to ignore 2+ sequential op, as we do not care
+                do {
+                    $this->input->next();
+                    $item2 = $this->input->peek();
+                } while ($item2['type'] === 'op');
+
+                return $this->maybeBinary([
+                    'type' => ($item['value'] === '=' || $item['value'] === ':') ? 'assign' : 'binary',
+                    'operator' =>   $item['value'],
+                    'left' => $left,
+                    'right' => $this->maybeBinary($this->parseAtom(), $hisPrec),
+                ], $myPrec);
+            } else {
+                $this->croak("Skipped op");
+            }
+        }
+        return $left;
     }
 
     private function returnAndNext(mixed $var): mixed
