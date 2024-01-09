@@ -8,6 +8,8 @@ class HclAstInputParser
 
     private const PRECEDENCE = [
         "=" => 1,
+        "==" => 7,
+        "!=" => 7,
         "+" => 10,
         "-" => 10,
         "*" => 20,
@@ -133,14 +135,14 @@ class HclAstInputParser
         return $result;
     }
 
-    private function expectOpNext(string $op): void
-    {
-        if ($this->isOp($op)) {
-            $this->input->next();
-            return;
-        }
-        $this->croak('Expected op: ' . $op);
-    }
+    // private function expectOpNext(string $op): void
+    // {
+    //     if ($this->isOp($op)) {
+    //         $this->input->next();
+    //         return;
+    //     }
+    //     $this->croak('Expected op: ' . $op);
+    // }
 
     private function expectVarNext(): string
     {
@@ -265,12 +267,13 @@ class HclAstInputParser
 
     private function maybeBinary(array $left, int $myPrec)
     {
+        // print_r(func_get_args());
         $item = $this->input->peek();
         if ($item['type'] === 'op') {
             $hisPrec = self::PRECEDENCE[$item['value']];
             if ($hisPrec > $myPrec) {
 
-                // dirty hack to ignore 2+ sequential op, as we do not care
+                // dirty hack to ignore 2+ sequential op (var = -1), as we do not care
                 do {
                     $this->input->next();
                     $item2 = $this->input->peek();
