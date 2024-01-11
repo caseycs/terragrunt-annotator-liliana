@@ -135,14 +135,14 @@ class HclAstInputParser
         return $result;
     }
 
-    // private function expectOpNext(string $op): void
-    // {
-    //     if ($this->isOp($op)) {
-    //         $this->input->next();
-    //         return;
-    //     }
-    //     $this->croak('Expected op: ' . $op);
-    // }
+    private function expectOpNext(string $op): void
+    {
+        if ($this->isOp($op)) {
+            $this->input->next();
+            return;
+        }
+        $this->croak('Expected op: ' . $op);
+    }
 
     private function expectVarNext(): string
     {
@@ -260,33 +260,53 @@ class HclAstInputParser
         return $result;
     }
 
-    private function parseExpression()
+    private function parseExpression(): array
     {
         return $this->maybeBinary($this->parseAtom(), 0);
     }
 
-    private function maybeBinary(array $left, int $myPrec)
+    private function maybeBinary(array $left, int $myPrec): array
     {
-        // print_r(func_get_args());
+        var_dump(__METHOD__ . ':' . __LINE__);
+        print_r(func_get_args());
         $item = $this->input->peek();
         if ($item['type'] === 'op') {
-            $hisPrec = self::PRECEDENCE[$item['value']];
-            if ($hisPrec > $myPrec) {
+            if ($item['value'] === '?') {
+                // ternary operation
+                // var_dump(func_get_args());
+                // die;
+                $this->input->next();
+                // var_dump(__METHOD__ . ':' . __LINE__);
+                $ifTrue = $this->maybeBinary($this->parseAtom(), 0);
+                // var_dump($ifTrue);
+                // die;
+                $this->expectOpNext(':');
+                $ifElse = $this->parseExpression();
+                return [
+                    'type' => 'if',
+                    'condition' => $left,
+                    'then' => $ifTrue,
+                    'else' => $ifElse,
+                ];
+            } elseif ($item['value'] !== ':') {
+                $hisPrec = self::PRECEDENCE[$item['value']];
+                if ($hisPrec > $myPrec) {
 
-                // dirty hack to ignore 2+ sequential op (var = -1), as we do not care
-                do {
-                    $this->input->next();
-                    $item2 = $this->input->peek();
-                } while ($item2['type'] === 'op');
+                    // dirty hack to ignore 2+ sequential op (var = -1), as we do not care
+                    do {
+                        $this->input->next();
+                        $item2 = $this->input->peek();
+                    } while ($item2['type'] === 'op' && $item2['value'] !== '?');
 
-                return $this->maybeBinary([
-                    'type' => ($item['value'] === '=' || $item['value'] === ':') ? 'assign' : 'binary',
-                    'operator' =>   $item['value'],
-                    'left' => $left,
-                    'right' => $this->maybeBinary($this->parseAtom(), $hisPrec),
-                ], $myPrec);
-            } else {
-                $this->croak("Skipped op");
+                    return $this->maybeBinary([
+                        'type' => ($item['value'] === '=' || $item['value'] === ':') ? 'assign' : 'binary',
+                        'operator' =>   $item['value'],
+                        'left' => $left,
+                        'right' => $this->maybeBinary($this->parseAtom(), $hisPrec),
+                    ], $myPrec);
+                } else {
+                    $this->croak("Skipped op");
+                }
             }
         }
         return $left;

@@ -1,32 +1,39 @@
 include "provider" {
+  # varl1 = local.remote_overwrite != 1
   // Liliana file:///./../../../../provider-aws.hcl
-  path = find_in_parent_folders("provider-aws.hcl")
-  path = "a"
+  # path = find_in_parent_folders("provider-aws.hcl")
+  # path = "a"
+  path = -1 ? "a" : "b"
 
-  db_name            = "${local.project.name}_${replace(local.application.name, "-", "_")}"
+  # "a" = true
+  # 1 = true
+  # versioning = {
+  #   status = false
+  #   abc = "fds"
+  #   d = {
+  #     a = "fd"
+  #   }
+  # }
 
-  val2 = -3
-  val2 = - dependency.vpc[0].fds
+  # val1 = func1()[0]
+  # val2 = var1["fds"]
+  # val2 = -*3 * 1 
+  # val2 = "fds"
+  # subnet_id = dependency.vpc[0].fds
+  # subnet_id = dependency.vpc[0].fds[1]
+  # subnet_id = dependency.vpc[0][1]
+  # subnet_id = dependency.vpc[0][1].abc
+
+  # lifecycle_rule = ["a"]
+
+  # db_name            = "${local.project.name}_${replace(local.application.name, "-", "_")}"
+
+  # val2 = -3
+  # val2 = - dependency.vpc[0].fds
 }
 
 # terraform {
-#   "a" = true
-#   1 = true
-#   versioning = {
-#     status = false
-#     abc = "fds"
-#     d = {
-#       a = "fd"
-#     }
-#   }
 
-#   val1 = func1()[0]
-#   val2 = var1["fds"]
-#   val2 = 3
-#   val2 = "fds"
-#   subnet_id = dependency.vpc.outputs.public_subnets[0].fds
-
-#   lifecycle_rule = ["a"]
 # }
 
 # terraform {

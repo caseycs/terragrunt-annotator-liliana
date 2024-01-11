@@ -106,7 +106,7 @@ class HclAstInputTokenizer
 
     private function isOp(string $ch): bool
     {
-        return strpos('+-*/%=&|<>!:', $ch) !== false;
+        return strpos('+-*/%=&|<>!:?', $ch) !== false;
     }
 
     private function skipComment(): void
