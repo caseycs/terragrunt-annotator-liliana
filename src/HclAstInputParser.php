@@ -267,8 +267,8 @@ class HclAstInputParser
 
     private function maybeBinary(array $left, int $myPrec): array
     {
-        var_dump(__METHOD__ . ':' . __LINE__);
-        print_r(func_get_args());
+        // var_dump(__METHOD__ . ':' . __LINE__);
+        // print_r(func_get_args());
         $item = $this->input->peek();
         if ($item['type'] === 'op') {
             if ($item['value'] === '?') {
