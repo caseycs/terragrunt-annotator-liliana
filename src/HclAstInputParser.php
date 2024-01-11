@@ -56,12 +56,12 @@ class HclAstInputParser
         }
         $blockBody = $this->parseBlockVars();
 
-        return [
+        return $this->appendPos([
             'type' => 'block',
             'blockType' => $blockType,
             'blockName' => $blockName,
             'body' => $blockBody,
-        ];
+        ]);
     }
 
     private function parseBlockVars()
@@ -183,15 +183,19 @@ class HclAstInputParser
                 // next token to process
                 $this->expectPuncNext(')');
 
-                return [
+                return $this->appendPos([
                     'type' => 'functionCall',
                     'name' => $value,
                     'args' => $args,
                     'result' => $this->parseVariableOrFunctionSuffix(),
-                ];
+                ]);
             } else {
                 // regular var
-                return ['type' => 'variable', 'name' => $value, 'result' => $this->parseVariableOrFunctionSuffix(),];
+                return $this->appendPos([
+                    'type' => 'variable',
+                    'name' => $value,
+                    'result' => $this->parseVariableOrFunctionSuffix(),
+                ]);
             }
         }
 
@@ -213,14 +217,14 @@ class HclAstInputParser
             // next token to process
             $this->expectPuncNext(']');
 
-            return ['type' => 'list', 'items' => $items];
+            return $this->appendPos(['type' => 'list', 'items' => $items]);
         }
 
         // assoc 
         if ($this->isPunc('{')) {
             $value = $this->input->peek()['value'];
             $items = $this->parseBlockVars();
-            return ['type' => 'assoc', 'name' => $value, 'items' => $items];
+            return $this->appendPos(['type' => 'assoc', 'name' => $value, 'items' => $items]);
         }
 
         $this->croak('Unexpected');
@@ -282,12 +286,12 @@ class HclAstInputParser
                 // die;
                 $this->expectOpNext(':');
                 $ifElse = $this->parseExpression();
-                return [
+                return $this->appendPos([
                     'type' => 'if',
                     'condition' => $left,
                     'then' => $ifTrue,
                     'else' => $ifElse,
-                ];
+                ]);
             } elseif ($item['value'] !== ':') {
                 $hisPrec = self::PRECEDENCE[$item['value']];
                 if ($hisPrec > $myPrec) {
@@ -298,12 +302,12 @@ class HclAstInputParser
                         $item2 = $this->input->peek();
                     } while ($item2['type'] === 'op' && $item2['value'] !== '?');
 
-                    return $this->maybeBinary([
+                    return $this->maybeBinary($this->appendPos([
                         'type' => ($item['value'] === '=' || $item['value'] === ':') ? 'assign' : 'binary',
                         'operator' =>   $item['value'],
                         'left' => $left,
                         'right' => $this->maybeBinary($this->parseAtom(), $hisPrec),
-                    ], $myPrec);
+                    ]), $myPrec);
                 } else {
                     $this->croak("Skipped op");
                 }
@@ -333,5 +337,14 @@ class HclAstInputParser
     private function croak(string $msg): void
     {
         $this->input->croak($msg);
+    }
+
+    private function appendPos(array $array): array
+    {
+        $array['file'] = [
+            'line' => $this->input->peekPreviousPos()[0],
+            'col' => $this->input->peekPreviousPos()[1],
+        ];
+        return $array;
     }
 }

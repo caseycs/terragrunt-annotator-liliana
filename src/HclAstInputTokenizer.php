@@ -16,6 +16,11 @@ class HclAstInputTokenizer
         return $this->current;
     }
 
+    public function peekPreviousPos(): array
+    {
+        return $this->input->previousPos();
+    }
+
     public function peek(): ?array
     {
         if ($this->current === null) {

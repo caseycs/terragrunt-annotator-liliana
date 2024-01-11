@@ -8,12 +8,17 @@ class HclAstInputStream
     private int $line = 1;
     private int $col = 0;
 
+    private array $previousPos = [1, 0];
+
     public function __construct(private string $hcl)
     {
     }
 
     public function next(): string
     {
+        $this->previousPos[0] = $this->line;
+        $this->previousPos[1] = $this->col;
+
         $r = $this->hcl[$this->pos++];
         if ($r === PHP_EOL) {
             $this->line++;
@@ -22,6 +27,11 @@ class HclAstInputStream
             $this->col++;
         }
         return $r;
+    }
+
+    public function previousPos(): array
+    {
+        return $this->previousPos;
     }
 
     public function peekNextOnMatch(string $match): bool
