@@ -15,6 +15,8 @@ class HclAstInputParser
         "*" => 20,
         "/" => 20,
         "%" => 20,
+        "?" => 2,
+        ":" => 3,
     ];
 
     public function __construct(private HclAstInputTokenizer $input)
@@ -269,48 +271,55 @@ class HclAstInputParser
         return $this->maybeBinary($this->parseAtom(), 0);
     }
 
-    private function maybeBinary(array $left, int $myPrec): array
+    private function maybeTernary(array $item): array
     {
-        // var_dump(__METHOD__ . ':' . __LINE__);
-        // print_r(func_get_args());
+        if ($item['type'] === 'binary' && $item['operator'] === '?') {
+            // print_r($item['right']);
+            if ($item['right']['type'] !== 'binary' || $item['right']['operator'] !== ':') {
+                $this->croak('Ternary else not found');
+            }
+            return [
+                'type' => 'ternary',
+                'expression' => $item['left'],
+                'then' => $item['right']['left'],
+                'else' => $item['right']['right'],
+            ];
+        }
+        return $item;
+    }
+
+    private function maybeBinary(array $left, int $myPrec, bool $expectElse = false): array
+    {
         $item = $this->input->peek();
         if ($item['type'] === 'op') {
-            if ($item['value'] === '?') {
-                // ternary operation
-                // var_dump(func_get_args());
-                // die;
-                $this->input->next();
-                // var_dump(__METHOD__ . ':' . __LINE__);
-                $ifTrue = $this->maybeBinary($this->parseAtom(), 0);
-                // var_dump($ifTrue);
-                // die;
-                $this->expectOpNext(':');
-                $ifElse = $this->parseExpression();
-                return $this->appendPos([
-                    'type' => 'if',
-                    'condition' => $left,
-                    'then' => $ifTrue,
-                    'else' => $ifElse,
-                ]);
-            } elseif ($item['value'] !== ':') {
-                $hisPrec = self::PRECEDENCE[$item['value']];
-                if ($hisPrec > $myPrec) {
+            $hisPrec = self::PRECEDENCE[$item['value']];
+            if ($hisPrec > $myPrec) {
 
-                    // dirty hack to ignore 2+ sequential op (var = -1), as we do not care
-                    do {
-                        $this->input->next();
-                        $item2 = $this->input->peek();
-                    } while ($item2['type'] === 'op' && $item2['value'] !== '?');
+                // dirty hack to ignore 2+ sequential op (var = -1), as we do not care
+                do {
+                    $this->input->next();
+                    $item2 = $this->input->peek();
+                } while ($item2['type'] === 'op'/* && strpos('?:', $item2['value']) === false*/);
 
-                    return $this->maybeBinary($this->appendPos([
-                        'type' => ($item['value'] === '=' || $item['value'] === ':') ? 'assign' : 'binary',
+                $right = $this->maybeBinary(
+                    $this->parseAtom(),
+                    $hisPrec,
+                    $expectElse
+                );
+
+                $result =
+                $this->maybeBinary(
+                    $this->appendPos($this->maybeTernary([
+                        'type' => ($item['value'] === '=') ? 'assign' : 'binary',
                         'operator' =>   $item['value'],
                         'left' => $left,
-                        'right' => $this->maybeBinary($this->parseAtom(), $hisPrec),
-                    ]), $myPrec);
-                } else {
-                    $this->croak("Skipped op");
-                }
+                        'right' => $right,
+                    ])),
+                    $myPrec,
+                    $expectElse
+                );
+
+                return $result;
             }
         }
         return $left;
@@ -341,10 +350,10 @@ class HclAstInputParser
 
     private function appendPos(array $array): array
     {
-        $array['file'] = [
-            'line' => $this->input->peekPreviousPos()[0],
-            'col' => $this->input->peekPreviousPos()[1],
-        ];
+        // $array['file'] = [
+        //     'line' => $this->input->peekPreviousPos()[0],
+        //     'col' => $this->input->peekPreviousPos()[1],
+        // ];
         return $array;
     }
 }

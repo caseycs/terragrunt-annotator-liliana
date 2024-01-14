@@ -3,7 +3,11 @@ include "provider" {
   // Liliana file:///./../../../../provider-aws.hcl
   # path = find_in_parent_folders("provider-aws.hcl")
   # path = "a"
-  path = -1 ? "a" : "b"
+  # key             = 1+1?2+2:3+3
+  # key             = 1 + 2 +3 + 4  / 1 ? 1 + 1 : 2 + 2
+  # key             = 1 + func(1?2:3) ? 1 + 1 + 1 : 2 + 4
+  key             = 1 + 2 +3 + 4  + func(1+1) / 1 ? 1 + 1 + 1 : 2 + 4
+  key             = 1?2:3
 
   # "a" = true
   # 1 = true
