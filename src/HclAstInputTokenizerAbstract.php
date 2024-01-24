@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-class HclAstInputTokenizer
+abstract class HclAstInputTokenizerAbstract
 {
-    private ?array $current = null;
+    protected ?array $current = null;
 
-    public function __construct(private HclAstInputStream $input)
+    public function __construct(protected HclAstInputStream $input)
     {
     }
 
@@ -16,20 +16,14 @@ class HclAstInputTokenizer
         return $this->current;
     }
 
+    public function peek(): ?array
+    {
+        return $this->current;
+    }
+
     public function peekPreviousPos(): array
     {
         return $this->input->previousPos();
-    }
-
-    public function peek(): ?array
-    {
-        if ($this->current === null) {
-            if ($this->eof()) {
-                throw new \LogicException('End of file reached');
-            }
-            throw new \LogicException('Call next() first');
-        }
-        return $this->current;
     }
 
     public function eof(): bool
@@ -37,7 +31,7 @@ class HclAstInputTokenizer
         return $this->input->eof();
     }
 
-    private function readNext(): ?array
+    protected function readNext(): ?array
     {
         $this->readWhile([$this, 'isWhitespace']);
         if ($this->input->eof()) {
@@ -74,7 +68,7 @@ class HclAstInputTokenizer
         $this->input->croak("Can't handle char: " . $c);
     }
 
-    private function readWhile(callable $fn): string
+    protected function readWhile(callable $fn): string
     {
         $r = "";
         while (!$this->input->eof() && $fn($this->input->peek())) {
@@ -83,49 +77,49 @@ class HclAstInputTokenizer
         return $r;
     }
 
-    private function isWhitespace(string $ch): bool
+    protected function isWhitespace(string $ch): bool
     {
         return in_array($ch, [' ', "\n", "\t"], true);
     }
 
-    private function isDigit(string $ch): bool
+    protected function isDigit(string $ch): bool
     {
         return $ch === (string)(int)$ch;
     }
 
-    private function isId(string $ch): bool
+    protected function isId(string $ch): bool
     {
         return $this->isIdStart($ch)
             || strpos('_0123456789-', $ch) !== false;
     }
 
-    private function isIdStart(string $ch): bool
+    protected function isIdStart(string $ch): bool
     {
         return preg_match('/[a-z]/i', $ch) === 1;
     }
 
-    private function isPunc(string $ch): bool
+    protected function isPunc(string $ch): bool
     {
         return strpos('.,;(){}[]', $ch) !== false;
     }
 
-    private function isOp(string $ch): bool
+    protected function isOp(string $ch): bool
     {
         return strpos('+-*/%=&|<>!:?', $ch) !== false;
     }
 
-    private function skipComment(): void
+    protected function skipComment(): void
     {
         $this->readWhile(fn ($s) => $s !== PHP_EOL);
         $this->input->next();
     }
 
-    private function readString()
+    protected function readString()
     {
         return ['type' => 'str', 'value' => $this->readStringEscaped('"')];
     }
 
-    private function readStringEscaped($end): string
+    protected function readStringEscaped($end): string
     {
         $escaped = false;
         $varSubstitution = false;
@@ -153,7 +147,7 @@ class HclAstInputTokenizer
         return $r;
     }
 
-    private function readMultilineString()
+    protected function readMultilineString()
     {
         $this->input->next();
         $end = $this->readIdent()['value'];
@@ -170,19 +164,19 @@ class HclAstInputTokenizer
         return ['type' => 'str', 'value' => substr($r, 0, -strlen($end))];
     }
 
-    private function readNumber()
+    protected function readNumber()
     {
         $v = $this->readWhile([$this, 'isDigit']);
         return ['type' => 'num', 'value' => (int)$v];
     }
 
-    private function readIdent()
+    protected function readIdent()
     {
         $id = $this->readWhile([$this, 'isId']);
         return ['type' => $this->isKeyword($id) ? 'keyword' : 'var', 'value' => $id];
     }
 
-    private function isKeyword(string $id): bool
+    protected function isKeyword(string $id): bool
     {
         return in_array($id, ['true', 'false'], true);
     }

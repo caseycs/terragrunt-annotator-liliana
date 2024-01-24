@@ -14,10 +14,13 @@ class HclAstInputStream
     {
     }
 
-    public function next(): string
+    public function next(): ?string
     {
-        $this->previousPos[0] = $this->line;
-        $this->previousPos[1] = $this->col;
+        if ($this->eof()) {
+            return null;
+        }
+
+        $this->previousPos = [$this->line, $this->col];
 
         $r = $this->hcl[$this->pos++];
         if ($r === PHP_EOL) {
@@ -47,6 +50,12 @@ class HclAstInputStream
         return false;
     }
 
+    public function peekNextEquals(string $match): bool
+    {
+        return $this->pos + 1 < strlen($this->hcl)
+            && $this->hcl[$this->pos + 1] === $match;
+    }
+
     public function peek(): string
     {
         return $this->hcl[$this->pos];
@@ -54,7 +63,7 @@ class HclAstInputStream
 
     public function eof(): bool
     {
-        return $this->pos >= strlen($this->hcl) - 1;
+        return $this->pos >= strlen($this->hcl);
     }
 
     public function croak($msg): void
